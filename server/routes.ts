@@ -9,6 +9,10 @@ if (!process.env.GOOGLE_MAPS_API_KEY) {
 export function registerRoutes(app: Express): Server {
   // Google Maps API endpoints
   app.get("/api/maps/script", (_req, res) => {
+    if (!process.env.GOOGLE_MAPS_API_KEY) {
+      res.status(500).json({ error: "Google Maps API key is not configured" });
+      return;
+    }
     res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY });
   });
 
@@ -23,9 +27,10 @@ export function registerRoutes(app: Express): Server {
       res.set("Content-Type", response.headers.get("content-type") || "image/jpeg");
 
       // Convert ReadableStream to Node.js stream
-      const readable = Readable.fromWeb(response.body!);
+      const readable = Readable.fromWeb(response.body as any);
       readable.pipe(res);
     } catch (error) {
+      console.error("Photo fetch error:", error);
       res.status(500).json({ error: "Failed to fetch photo" });
     }
   });
