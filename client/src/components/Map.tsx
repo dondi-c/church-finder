@@ -24,37 +24,46 @@ export default function Map({ onChurchSelect }: MapProps) {
   const { data: mapConfig, isLoading, isError, error } = useQuery({
     queryKey: ["/api/maps/script"],
     queryFn: async () => {
-      const response = await fetchWithError("/api/maps/script");
-      const data = await response.json();
-      console.log("Map config loaded:", data); // Debug log
-      return data;
+      try {
+        const response = await fetchWithError("/api/maps/script");
+        const data = await response.json();
+        console.log("Map config loaded:", data);
+        return data;
+      } catch (error) {
+        console.error("Error fetching map config:", error);
+        throw error;
+      }
     },
   });
 
   useEffect(() => {
     if (!mapConfig?.apiKey || !mapRef.current) {
-      console.log("Missing config or ref:", { hasConfig: !!mapConfig?.apiKey, hasRef: !!mapRef.current }); // Debug log
+      console.log("Missing config or ref:", { hasConfig: !!mapConfig?.apiKey, hasRef: !!mapRef.current });
       return;
     }
 
     const loadGoogleMaps = async () => {
       try {
         if (window.google?.maps) {
-          console.log("Google Maps already loaded, initializing map"); // Debug log
+          console.log("Google Maps already loaded, initializing map");
           initializeMap();
           return;
         }
 
-        console.log("Loading Google Maps script"); // Debug log
+        console.log("Loading Google Maps script");
         await new Promise<void>((resolve, reject) => {
           const script = document.createElement("script");
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${mapConfig.apiKey}&libraries=places`;
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${mapConfig.apiKey}&libraries=places&v=weekly`;
           script.async = true;
+          script.defer = true;
           script.onload = () => {
-            console.log("Google Maps script loaded successfully"); // Debug log
+            console.log("Google Maps script loaded successfully");
             resolve();
           };
-          script.onerror = () => reject(new Error("Failed to load Google Maps"));
+          script.onerror = (error) => {
+            console.error("Google Maps script load error:", error);
+            reject(new Error("Failed to load Google Maps"));
+          };
           document.head.appendChild(script);
         });
 
@@ -63,7 +72,7 @@ export default function Map({ onChurchSelect }: MapProps) {
         console.error("Error loading Google Maps:", error);
         toast({
           title: "Error",
-          description: "Failed to load Google Maps",
+          description: "Failed to load Google Maps. Please ensure you have proper API access.",
           variant: "destructive",
         });
       }
@@ -88,7 +97,7 @@ export default function Map({ onChurchSelect }: MapProps) {
 
     service.nearbySearch(request, (results: Church[], status: any) => {
       if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-        console.log("Found churches:", results.length); // Debug log
+        console.log("Found churches:", results.length);
 
         // Clear existing markers
         markersRef.current.forEach((marker) => marker.setMap(null));
@@ -113,9 +122,14 @@ export default function Map({ onChurchSelect }: MapProps) {
         });
       } else {
         console.error("Places search failed:", status);
+        toast({
+          title: "Error",
+          description: "Failed to load nearby churches. Please try again.",
+          variant: "destructive",
+        });
       }
     });
-  }, [onChurchSelect]);
+  }, [onChurchSelect, toast]);
 
   const initializeMap = useCallback(() => {
     if (!window.google?.maps) {
@@ -124,7 +138,7 @@ export default function Map({ onChurchSelect }: MapProps) {
     }
 
     try {
-      console.log("Initializing map"); // Debug log
+      console.log("Initializing map");
       const map = new window.google.maps.Map(mapRef.current, {
         center: { lat: 40.7128, lng: -74.0060 }, // Default to New York City
         zoom: 13,
@@ -149,7 +163,7 @@ export default function Map({ onChurchSelect }: MapProps) {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            console.log("Got user location"); // Debug log
+            console.log("Got user location");
             map.setCenter({
               lat: position.coords.latitude,
               lng: position.coords.longitude,
@@ -157,7 +171,7 @@ export default function Map({ onChurchSelect }: MapProps) {
             map.setZoom(14);
           },
           (error) => {
-            console.log("Geolocation failed:", error); // Debug log
+            console.log("Geolocation failed:", error);
             // If geolocation fails, use the default location (already set)
             console.log("Using default location");
           }
@@ -173,7 +187,7 @@ export default function Map({ onChurchSelect }: MapProps) {
       console.error("Error initializing map:", error);
       toast({
         title: "Error",
-        description: "Failed to initialize the map",
+        description: "Failed to initialize the map. Please refresh the page.",
         variant: "destructive",
       });
     }
