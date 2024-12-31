@@ -13,7 +13,6 @@ import ReviewForm from "./ReviewForm";
 import { ChurchDetails, ServiceTime } from "@/types/church";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
-import { FallbackImage } from "@/components/ui/fallback-image";
 
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -23,7 +22,6 @@ interface ChurchInfoProps {
 
 export default function ChurchInfo({ church }: ChurchInfoProps) {
   const { toast } = useToast();
-  const [imageError, setImageError] = useState(false);
 
   const { data: churchDetails, isError } = useQuery<ChurchDetails>({
     queryKey: [`/api/churches/${church?.place_id}`],
@@ -63,10 +61,6 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
       </Card>
     );
   }
-
-  const photoUrl = church.photos?.[0]?.photo_reference 
-    ? `/api/maps/photo/${church.photos[0].photo_reference}?maxwidth=400`
-    : null;
 
   return (
     <Card>
@@ -152,28 +146,6 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
             {churchDetails.description}
           </p>
         )}
-
-        {/* Church photo section */}
-        <div className="mt-4">
-          {photoUrl && !imageError ? (
-            <img
-              src={photoUrl}
-              alt={church.name}
-              className="w-full h-48 object-cover rounded-md"
-              onError={() => {
-                console.error("Failed to load church photo");
-                setImageError(true);
-                toast({
-                  title: "Photo Error",
-                  description: "Could not load the church photo. Showing placeholder instead.",
-                  variant: "destructive",
-                });
-              }}
-            />
-          ) : (
-            <FallbackImage />
-          )}
-        </div>
 
         <Separator className="my-4" />
 

@@ -21,41 +21,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Places Photo endpoint
-  app.get("/api/maps/photo/:reference", async (req, res) => {
-    try {
-      const { reference } = req.params;
-      if (!reference) {
-        return res.status(400).json({ error: "Photo reference is required" });
-      }
-
-      console.log("Fetching photo for reference:", reference);
-      const maxwidth = req.query.maxwidth || 400;
-      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        console.error("Google Places photo error:", response.status, response.statusText);
-        return res.status(response.status).json({ error: "Failed to fetch photo from Google Places" });
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Set appropriate headers
-      const contentType = response.headers.get('content-type');
-      res.set('Content-Type', contentType || 'image/jpeg');
-      res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-
-      // Send the buffer directly
-      res.send(buffer);
-    } catch (error) {
-      console.error("Photo fetch error:", error);
-      res.status(500).json({ error: "Failed to fetch photo" });
-    }
-  });
-
   // Church Management API endpoints
   app.post("/api/churches", async (req, res) => {
     try {

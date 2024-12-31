@@ -12,7 +12,6 @@ export type Church = {
   name: string;
   vicinity: string;
   rating?: number;
-  photos?: { photo_reference: string }[];
   geometry: {
     location: {
       lat: number;
