@@ -23,17 +23,18 @@ interface ChurchInfoProps {
 
 export default function ChurchInfo({ church }: ChurchInfoProps) {
   const { toast } = useToast();
-  const [photoError, setPhotoError] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const { data: churchDetails, isError } = useQuery<ChurchDetails>({
     queryKey: [`/api/churches/${church?.place_id}`],
     enabled: !!church?.place_id,
   });
 
-  // New query for church photo
+  // Query for church photo
   const { data: photoData } = useQuery<{ imageUrl: string }>({
     queryKey: [`/api/churches/photos/${encodeURIComponent(church?.name || '')}`],
-    enabled: !!church?.name && !photoError,
+    enabled: !!church?.name,
+    retry: 1,
   });
 
   const handleGetDirections = () => {
@@ -45,7 +46,6 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
       );
     }
   };
-
 
   if (!church) {
     return (
@@ -158,14 +158,14 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
 
         {church.name && (
           <div className="mt-4">
-            {!photoError && photoData?.imageUrl ? (
+            {photoData?.imageUrl && !imageError ? (
               <img
                 src={photoData.imageUrl}
                 alt={church.name}
                 className="w-full h-48 object-cover rounded-md"
-                onError={(e) => {
-                  console.error("Failed to load church photo");
-                  setPhotoError(true);
+                onError={() => {
+                  console.error("Failed to load church photo from URL:", photoData.imageUrl);
+                  setImageError(true);
                   toast({
                     title: "Photo Error",
                     description: "Could not load the church photo. Showing placeholder instead.",
@@ -178,7 +178,6 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
             )}
           </div>
         )}
-
 
         <Separator className="my-4" />
 

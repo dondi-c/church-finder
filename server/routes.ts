@@ -29,29 +29,43 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/churches/photos/:churchName", async (req, res) => {
     try {
       const { churchName } = req.params;
+      console.log("Fetching photo for church:", churchName);
+
       if (!churchName) {
+        console.error("No church name provided");
         return res.status(400).json({ error: "Church name is required" });
       }
 
       const searchQuery = `${churchName} church building exterior`;
+      console.log("Search query:", searchQuery);
+
       const url = `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&cx=${process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID}&key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&searchType=image&num=1`;
 
+      console.log("Making request to Google Custom Search API");
       const response = await fetch(url);
       const data = await response.json();
 
       if (!response.ok) {
         console.error("Google Custom Search error:", data);
-        return res.status(response.status).json({ error: "Failed to fetch church photo" });
+        return res.status(response.status).json({ 
+          error: "Failed to fetch church photo",
+          details: data.error?.message || "Unknown error"
+        });
       }
 
       if (!data.items?.[0]?.link) {
+        console.log("No photos found for church:", churchName);
         return res.status(404).json({ error: "No photos found" });
       }
 
+      console.log("Found photo URL:", data.items[0].link);
       res.json({ imageUrl: data.items[0].link });
     } catch (error) {
       console.error("Photo fetch error:", error);
-      res.status(500).json({ error: "Failed to fetch photo" });
+      res.status(500).json({ 
+        error: "Failed to fetch photo",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
