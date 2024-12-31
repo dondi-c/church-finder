@@ -23,16 +23,27 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/maps/photo/:reference", async (req, res) => {
-    const { reference } = req.params;
-    const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-
     try {
+      const { reference } = req.params;
+      if (!reference) {
+        return res.status(400).json({ error: "Photo reference is required" });
+      }
+
+      const maxwidth = req.query.maxwidth || 400;
+      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${encodeURIComponent(reference)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch photo");
 
-      res.set("Content-Type", response.headers.get("content-type") || "image/jpeg");
+      if (!response.ok) {
+        console.error("Google Places photo error:", response.status, response.statusText);
+        return res.status(response.status).json({ error: "Failed to fetch photo from Google Places" });
+      }
 
-      // Convert ReadableStream to Node.js stream
+      // Set appropriate headers from the Google response
+      res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
+      // Stream the response
       const readable = Readable.fromWeb(response.body as any);
       readable.pipe(res);
     } catch (error) {

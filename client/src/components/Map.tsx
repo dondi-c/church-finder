@@ -92,6 +92,8 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
   const searchChurches = useCallback((map: any) => {
     const service = new window.google.maps.places.PlacesService(map);
     const bounds = map.getBounds();
+    if (!bounds) return;
+
     const request = {
       bounds,
       type: "church",
@@ -107,10 +109,10 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
           try {
             if (!place.geometry?.location || !place.place_id) continue;
 
-            // Get photo references before they expire
-            const photos = place.photos?.map((photo: any) => ({
-              photo_reference: photo.photo_reference,
-            }));
+            // Ensure we capture photo references if available
+            const photos = place.photos?.slice(0, 1).map((photo: any) => ({
+              photo_reference: photo.getUrl({ maxWidth: 400 }),
+            })) || [];
 
             // Fetch church details to check denomination
             const response = await fetch(
@@ -161,7 +163,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
                     lng: place.geometry.location.lng(),
                   },
                 },
-                photos: photos,
+                photos,
               };
 
               onChurchSelect(church);
@@ -172,8 +174,6 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
             console.error("Error processing church:", error);
           }
         }
-      } else {
-        console.error("Places service error:", status);
       }
     });
   }, [onChurchSelect, selectedDenomination]);
