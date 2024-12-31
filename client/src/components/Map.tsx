@@ -3,144 +3,101 @@ import { useQuery } from "@tanstack/react-query";
 import { Church } from "../pages/Home";
 import LoadingState from "@/components/LoadingState";
 import { useToast } from "@/hooks/use-toast";
-import { fetchWithError } from "@/lib/api";
 
 interface MapProps {
   onChurchSelect: (church: Church) => void;
 }
 
+// Add proper type declarations for Google Maps
 declare global {
   interface Window {
-    google: any;
+    google: typeof google;
     initMap: () => void;
   }
 }
 
 export default function Map({ onChurchSelect }: MapProps) {
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
   const { toast } = useToast();
 
   const { data: mapConfig, isLoading, isError, error } = useQuery({
     queryKey: ["/api/maps/script"],
-    queryFn: async () => {
-      try {
-        const response = await fetchWithError("/api/maps/script");
-        const data = await response.json();
-        console.log("Map config loaded:", data);
-        return data;
-      } catch (error) {
-        console.error("Error fetching map config:", error);
-        throw error;
-      }
-    },
+    retry: false,
   });
 
-  useEffect(() => {
-    if (!mapConfig?.apiKey || !mapRef.current) {
-      console.log("Missing config or ref:", { hasConfig: !!mapConfig?.apiKey, hasRef: !!mapRef.current });
-      return;
-    }
-
-    const loadGoogleMaps = async () => {
-      try {
-        if (window.google?.maps) {
-          console.log("Google Maps already loaded, initializing map");
-          initializeMap();
-          return;
-        }
-
-        console.log("Loading Google Maps script");
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${mapConfig.apiKey}&libraries=places&v=weekly`;
-          script.async = true;
-          script.defer = true;
-          script.onload = () => {
-            console.log("Google Maps script loaded successfully");
-            resolve();
-          };
-          script.onerror = (error) => {
-            console.error("Google Maps script load error:", error);
-            reject(new Error("Failed to load Google Maps"));
-          };
-          document.head.appendChild(script);
-        });
-
-        initializeMap();
-      } catch (error) {
-        console.error("Error loading Google Maps:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load Google Maps. Please ensure you have proper API access.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    loadGoogleMaps();
-  }, [mapConfig?.apiKey, toast]);
-
-  const searchChurches = useCallback(async (map: any) => {
-    if (!window.google?.maps?.places) {
-      console.error("Google Places API not loaded");
-      return;
-    }
-
-    const service = new window.google.maps.places.PlacesService(map);
+  const searchChurches = useCallback((map: google.maps.Map) => {
+    const service = new google.maps.places.PlacesService(map);
     const bounds = map.getBounds();
+    if (!bounds) return;
 
     const request = {
       bounds,
-      type: ["church"],
+      type: "church",
     };
 
-    service.nearbySearch(request, (results: Church[], status: any) => {
-      if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-        console.log("Found churches:", results.length);
+    service.nearbySearch(
+      request,
+      (
+        results: google.maps.places.PlaceResult[],
+        status: google.maps.places.PlacesServiceStatus
+      ) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          // Clear existing markers
+          markersRef.current.forEach((marker) => marker.setMap(null));
+          markersRef.current = [];
 
-        // Clear existing markers
-        markersRef.current.forEach((marker) => marker.setMap(null));
-        markersRef.current = [];
+          results.forEach((place) => {
+            if (place.geometry?.location) {
+              const marker = new google.maps.Marker({
+                map,
+                position: place.geometry.location,
+                title: place.name,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: "#4f46e5",
+                  fillOpacity: 1,
+                  strokeWeight: 2,
+                  strokeColor: "#ffffff",
+                },
+              });
 
-        results.forEach((place) => {
-          const marker = new window.google.maps.Marker({
-            map,
-            position: place.geometry.location,
-            title: place.name,
-            icon: {
-              url: "https://maps.google.com/mapfiles/kml/shapes/church.png",
-              scaledSize: new window.google.maps.Size(32, 32),
-            },
+              marker.addListener("click", () => {
+                if (place.place_id && place.name && place.vicinity) {
+                  onChurchSelect({
+                    place_id: place.place_id,
+                    name: place.name,
+                    vicinity: place.vicinity,
+                    rating: place.rating,
+                    geometry: {
+                      location: {
+                        lat: place.geometry!.location!.lat(),
+                        lng: place.geometry!.location!.lng(),
+                      },
+                    },
+                    photos: place.photos?.map((photo) => ({
+                      photo_reference: photo.getUrl(),
+                    })),
+                  });
+                }
+              });
+
+              markersRef.current.push(marker);
+            }
           });
-
-          marker.addListener("click", () => {
-            onChurchSelect(place);
-          });
-
-          markersRef.current.push(marker);
-        });
-      } else {
-        console.error("Places search failed:", status);
-        toast({
-          title: "Error",
-          description: "Failed to load nearby churches. Please try again.",
-          variant: "destructive",
-        });
+        }
       }
-    });
-  }, [onChurchSelect, toast]);
+    );
+  }, [onChurchSelect]);
 
   const initializeMap = useCallback(() => {
-    if (!window.google?.maps) {
-      console.error("Google Maps not loaded");
-      return;
-    }
+    if (!mapRef.current || !window.google?.maps) return;
 
     try {
-      console.log("Initializing map");
       const map = new window.google.maps.Map(mapRef.current, {
-        center: { lat: 40.7128, lng: -74.0060 }, // Default to New York City
+        center: { lat: 40.7128, lng: -74.006 },
         zoom: 13,
         styles: [
           {
@@ -150,11 +107,17 @@ export default function Map({ onChurchSelect }: MapProps) {
         ],
       });
 
-      mapRef.current.addEventListener("setCenter", (e: CustomEvent) => {
+      mapInstanceRef.current = map;
+
+      // Add custom event listener for centering
+      mapRef.current.addEventListener("setCenter", ((
+        e: CustomEvent<{ lat: number; lng: number }>
+      ) => {
         map.setCenter(e.detail);
         map.setZoom(14);
-      });
+      }) as EventListener);
 
+      // Search for churches when map becomes idle
       map.addListener("idle", () => {
         searchChurches(map);
       });
@@ -163,26 +126,18 @@ export default function Map({ onChurchSelect }: MapProps) {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            console.log("Got user location");
-            map.setCenter({
+            const userLocation = {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
-            });
+            };
+            map.setCenter(userLocation);
             map.setZoom(14);
           },
-          (error) => {
-            console.log("Geolocation failed:", error);
-            // If geolocation fails, use the default location (already set)
-            console.log("Using default location");
+          () => {
+            // Using default location (already set)
           }
         );
       }
-
-      return () => {
-        // Cleanup markers
-        markersRef.current.forEach((marker) => marker.setMap(null));
-        markersRef.current = [];
-      };
     } catch (error) {
       console.error("Error initializing map:", error);
       toast({
@@ -192,6 +147,52 @@ export default function Map({ onChurchSelect }: MapProps) {
       });
     }
   }, [searchChurches, toast]);
+
+  useEffect(() => {
+    if (!mapConfig?.apiKey) return;
+
+    const loadGoogleMaps = async () => {
+      try {
+        // If Google Maps is already loaded, initialize the map
+        if (window.google?.maps) {
+          initializeMap();
+          return;
+        }
+
+        // Load Google Maps script
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${mapConfig.apiKey}&libraries=places`;
+        script.async = true;
+
+        await new Promise<void>((resolve, reject) => {
+          script.onload = () => {
+            initializeMap();
+            resolve();
+          };
+          script.onerror = () => reject(new Error("Failed to load Google Maps"));
+          document.head.appendChild(script);
+        });
+      } catch (error) {
+        console.error("Error loading Google Maps:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load Google Maps. Please refresh the page.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadGoogleMaps();
+
+    // Cleanup function
+    return () => {
+      if (mapInstanceRef.current) {
+        // Clear all markers
+        markersRef.current.forEach((marker) => marker.setMap(null));
+        markersRef.current = [];
+      }
+    };
+  }, [mapConfig?.apiKey, initializeMap, toast]);
 
   if (isError) {
     return (
