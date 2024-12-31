@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, time } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, time, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -7,11 +7,6 @@ export const users = pgTable("users", {
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
 });
-
-export const insertUserSchema = createInsertSchema(users);
-export const selectUserSchema = createSelectSchema(users);
-export type InsertUser = typeof users.$inferInsert;
-export type SelectUser = typeof users.$inferSelect;
 
 export const churches = pgTable("churches", {
   id: serial("id").primaryKey(),
@@ -37,9 +32,19 @@ export const serviceTimes = pgTable("service_times", {
   language: text("language").default("English"),
 });
 
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  church_id: integer("church_id").references(() => churches.id).notNull(),
+  user_name: text("user_name").notNull(),
+  rating: decimal("rating", { precision: 2, scale: 1 }).notNull(),
+  comment: text("comment"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const churchRelations = relations(churches, ({ many }) => ({
   serviceTimes: many(serviceTimes),
+  reviews: many(reviews),
 }));
 
 export const serviceTimeRelations = relations(serviceTimes, ({ one }) => ({
@@ -49,14 +54,25 @@ export const serviceTimeRelations = relations(serviceTimes, ({ one }) => ({
   }),
 }));
 
+export const reviewRelations = relations(reviews, ({ one }) => ({
+  church: one(churches, {
+    fields: [reviews.church_id],
+    references: [churches.id],
+  }),
+}));
+
 // Schemas
 export const insertChurchSchema = createInsertSchema(churches);
 export const selectChurchSchema = createSelectSchema(churches);
 export const insertServiceTimeSchema = createInsertSchema(serviceTimes);
 export const selectServiceTimeSchema = createSelectSchema(serviceTimes);
+export const insertReviewSchema = createInsertSchema(reviews);
+export const selectReviewSchema = createSelectSchema(reviews);
 
 // Types
 export type Church = typeof churches.$inferSelect;
 export type InsertChurch = typeof churches.$inferInsert;
 export type ServiceTime = typeof serviceTimes.$inferSelect;
 export type InsertServiceTime = typeof serviceTimes.$inferInsert;
+export type Review = typeof reviews.$inferSelect;
+export type InsertReview = typeof reviews.$inferInsert;

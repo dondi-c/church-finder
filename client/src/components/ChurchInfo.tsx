@@ -10,6 +10,8 @@ import ServiceTimeForm from "./ServiceTimeForm";
 import ChurchDetailsForm from "./ChurchDetailsForm";
 import { ChurchDetails, ServiceTime } from "@/types/church";
 import { useToast } from "@/hooks/use-toast";
+import ReviewForm from "./ReviewForm";
+import { formatDistanceToNow } from "date-fns";
 
 interface ChurchInfoProps {
   church: Church | null;
@@ -23,10 +25,10 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
   const { data: churchDetails, isError } = useQuery<ChurchDetails>({
     queryKey: [`/api/churches/${church?.place_id}`],
     enabled: !!church?.place_id,
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load church details",
+        description: error.message || "Failed to load church details",
         variant: "destructive",
       });
     },
@@ -95,7 +97,7 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
         {churchDetails?.phone && (
           <div className="flex items-center gap-2">
             <Phone className="h-5 w-5 text-muted-foreground" />
-            <a 
+            <a
               href={`tel:${churchDetails.phone}`}
               className="text-sm text-primary hover:underline"
             >
@@ -107,7 +109,7 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
         {churchDetails?.website && (
           <div className="flex items-center gap-2">
             <Globe className="h-5 w-5 text-muted-foreground" />
-            <a 
+            <a
               href={churchDetails.website}
               target="_blank"
               rel="noopener noreferrer"
@@ -175,14 +177,79 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
                   {service.service_type && ` - ${service.service_type}`}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(`2000-01-01T${service.start_time}`), 'h:mm a')} - 
-                  {format(new Date(`2000-01-01T${service.end_time}`), 'h:mm a')}
-                  {service.language !== 'English' && ` (${service.language})`}
+                  {format(new Date(`2000-01-01T${service.start_time}`), "h:mm a")} -
+                  {format(new Date(`2000-01-01T${service.end_time}`), "h:mm a")}
+                  {service.language !== "English" && ` (${service.language})`}
                 </p>
               </div>
             ))
           ) : (
             <p className="text-sm text-muted-foreground">No service times available</p>
+          )}
+        </div>
+
+        <Separator className="my-4" />
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Star className="h-4 w-4" />
+              Reviews & Ratings
+            </h3>
+            {churchDetails?.id && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Review
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Write a Review</DialogTitle>
+                  </DialogHeader>
+                  <ReviewForm churchId={churchDetails.id} />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {churchDetails?.reviews && churchDetails.reviews.length > 0 ? (
+            <div className="space-y-4">
+              {churchDetails.reviews.map((review) => (
+                <div key={review.id} className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-medium">{review.user_name}</p>
+                      <div className="flex items-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-4 w-4 ${
+                              i < review.rating
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(review.created_at), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                  </div>
+                  {review.comment && (
+                    <p className="text-sm text-muted-foreground">
+                      {review.comment}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No reviews yet</p>
           )}
         </div>
       </CardContent>

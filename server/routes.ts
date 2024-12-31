@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { Readable } from "stream";
 import { db } from "@db";
-import { churches, serviceTimes, insertChurchSchema, insertServiceTimeSchema } from "@db/schema";
+import { churches, serviceTimes, reviews, insertChurchSchema, insertServiceTimeSchema, insertReviewSchema } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 
 if (!process.env.GOOGLE_MAPS_API_KEY) {
@@ -16,8 +16,8 @@ export function registerRoutes(app: Express): Server {
       res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY });
     } catch (error) {
       console.error("Maps API error:", error);
-      res.status(500).json({ 
-        error: "Failed to provide Google Maps API key" 
+      res.status(500).json({
+        error: "Failed to provide Google Maps API key"
       });
     }
   });
@@ -59,6 +59,9 @@ export function registerRoutes(app: Express): Server {
         where: eq(churches.place_id, req.params.placeId),
         with: {
           serviceTimes: true,
+          reviews: {
+            orderBy: desc(reviews.created_at),
+          },
         },
       });
 
@@ -78,6 +81,7 @@ export function registerRoutes(app: Express): Server {
         res.json({
           ...newChurch,
           serviceTimes: [],
+          reviews: [],
         });
         return;
       }
@@ -162,13 +166,33 @@ export function registerRoutes(app: Express): Server {
         .map(r => r.denomination)
         .filter((d): d is string => d != null && d !== "");
 
-      res.json([...new Set(denominations)]);
+      // Convert Set to Array before sending response
+      res.json(Array.from(new Set(denominations)));
     } catch (error) {
       console.error("Error fetching denominations:", error);
       res.status(500).json({ error: "Failed to fetch denominations" });
     }
   });
 
+
+  // Add new endpoint for church reviews
+  app.post("/api/churches/:churchId/reviews", async (req, res) => {
+    try {
+      const reviewData = insertReviewSchema.parse({
+        ...req.body,
+        church_id: parseInt(req.params.churchId),
+      });
+
+      const [review] = await db.insert(reviews)
+        .values(reviewData)
+        .returning();
+
+      res.status(201).json(review);
+    } catch (error) {
+      console.error("Error creating review:", error);
+      res.status(400).json({ error: "Invalid review data" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
