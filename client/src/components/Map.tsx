@@ -1,8 +1,10 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Church } from "../pages/Home";
 import LoadingState from "@/components/LoadingState";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface MapProps {
   onChurchSelect: (church: Church) => void;
@@ -24,12 +26,68 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const { toast } = useToast();
 
   const { data: mapConfig, isLoading, isError, error } = useQuery<MapConfig>({
     queryKey: ["/api/maps/script"],
     retry: false,
   });
+
+  const requestLocation = useCallback((map: any) => {
+    setIsLocating(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Your browser doesn't support geolocation. You can still browse the map manually.");
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        map.setCenter(userLocation);
+        map.setZoom(14);
+
+        toast({
+          title: "Location Found",
+          description: "Showing churches near you.",
+        });
+        setIsLocating(false);
+        setLocationError(null);
+      },
+      (error) => {
+        let errorMessage = "Unable to get your location. ";
+
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location permission was denied. To enable location access:\n1. Click the location icon in your browser's address bar\n2. Select 'Allow' for this site\n3. Refresh the page";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is currently unavailable. Please try again later.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out. Please check your connection and try again.";
+            break;
+          default:
+            errorMessage = "An unexpected error occurred while getting your location.";
+        }
+
+        setLocationError(errorMessage);
+        setIsLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  }, [toast]);
 
   const searchChurches = useCallback((map: any) => {
     const service = new window.google.maps.places.PlacesService(map);
@@ -152,63 +210,8 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
         searchChurches(map);
       });
 
-      // Try to get user's location in a more user-friendly way
-      if (navigator.geolocation) {
-        toast({
-          title: "Location Access",
-          description: "Please allow location access to find churches near you.",
-        });
+      requestLocation(map);
 
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const userLocation = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            map.setCenter(userLocation);
-            map.setZoom(14);
-
-            toast({
-              title: "Success",
-              description: "Found your location! Showing nearby churches.",
-            });
-          },
-          (error) => {
-            let errorMessage = "Unable to get your location. ";
-
-            switch(error.code) {
-              case error.PERMISSION_DENIED:
-                errorMessage += "You can use the 'My Location' button to try again when ready.";
-                break;
-              case error.POSITION_UNAVAILABLE:
-                errorMessage += "Location information is unavailable.";
-                break;
-              case error.TIMEOUT:
-                errorMessage += "Location request timed out.";
-                break;
-              default:
-                errorMessage += "An unknown error occurred.";
-            }
-
-            toast({
-              title: "Location Access",
-              description: errorMessage,
-              variant: "secondary",
-            });
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          }
-        );
-      } else {
-        toast({
-          title: "Location Services Unavailable",
-          description: "Your browser doesn't support geolocation. You can still browse the map manually.",
-          variant: "secondary",
-        });
-      }
     } catch (error) {
       console.error("Error initializing map:", error);
       toast({
@@ -217,7 +220,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
         variant: "destructive",
       });
     }
-  }, [searchChurches, toast]);
+  }, [searchChurches, toast, requestLocation]);
 
   useEffect(() => {
     if (!mapConfig?.apiKey) return;
@@ -281,5 +284,18 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
     return <LoadingState />;
   }
 
-  return <div ref={mapRef} role="map" className="w-full h-full" />;
+  return (
+    <div className="relative w-full h-full">
+      {locationError && (
+        <Alert variant="destructive" className="absolute top-4 left-4 right-4 z-10 max-w-md mx-auto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Location Error</AlertTitle>
+          <AlertDescription className="whitespace-pre-line">
+            {locationError}
+          </AlertDescription>
+        </Alert>
+      )}
+      <div ref={mapRef} role="map" className="w-full h-full" />
+    </div>
+  );
 }
