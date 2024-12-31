@@ -54,13 +54,6 @@ export const serviceTimeRelations = relations(serviceTimes, ({ one }) => ({
   }),
 }));
 
-export const reviewRelations = relations(reviews, ({ one }) => ({
-  church: one(churches, {
-    fields: [reviews.church_id],
-    references: [churches.id],
-  }),
-}));
-
 // Schemas
 export const insertChurchSchema = createInsertSchema(churches);
 export const selectChurchSchema = createSelectSchema(churches);
