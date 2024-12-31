@@ -30,7 +30,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const maxwidth = req.query.maxwidth || 400;
-      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photoreference=${reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
       const response = await fetch(url);
 
@@ -44,7 +44,12 @@ export function registerRoutes(app: Express): Server {
       res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
       // Stream the response directly
-      response.body.pipe(res);
+      if (response.body) {
+        const readable = Readable.fromWeb(response.body);
+        readable.pipe(res);
+      } else {
+        throw new Error("No response body received");
+      }
     } catch (error) {
       console.error("Photo fetch error:", error);
       res.status(500).json({ error: "Failed to fetch photo" });
