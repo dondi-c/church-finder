@@ -30,21 +30,6 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
     enabled: !!church?.place_id,
   });
 
-  // Query for church photo
-  const { data: photoData, isError: photoError, error: photoQueryError } = useQuery<{ imageUrl: string }>({
-    queryKey: [`/api/churches/photos/${encodeURIComponent(church?.name || '')}`],
-    enabled: !!church?.name,
-    retry: 1,
-    onError: (error) => {
-      console.error("Failed to fetch church photo:", error);
-      toast({
-        title: "Photo Error",
-        description: "Could not load the church photo. Showing placeholder instead.",
-        variant: "destructive",
-      });
-    }
-  });
-
   const handleGetDirections = () => {
     if (church?.geometry?.location) {
       const { lat, lng } = church.geometry.location;
@@ -78,6 +63,10 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
       </Card>
     );
   }
+
+  const photoUrl = church.photos?.[0]?.photo_reference 
+    ? `/api/maps/photo/${church.photos[0].photo_reference}?maxwidth=400`
+    : null;
 
   return (
     <Card>
@@ -164,28 +153,27 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           </p>
         )}
 
-        {church.name && (
-          <div className="mt-4">
-            {photoData?.imageUrl && !imageError ? (
-              <img
-                src={photoData.imageUrl}
-                alt={church.name}
-                className="w-full h-48 object-cover rounded-md"
-                onError={() => {
-                  console.error("Failed to load church photo from URL:", photoData.imageUrl);
-                  setImageError(true);
-                  toast({
-                    title: "Photo Error",
-                    description: "Could not load the church photo. Showing placeholder instead.",
-                    variant: "destructive",
-                  });
-                }}
-              />
-            ) : (
-              <FallbackImage />
-            )}
-          </div>
-        )}
+        {/* Church photo section */}
+        <div className="mt-4">
+          {photoUrl && !imageError ? (
+            <img
+              src={photoUrl}
+              alt={church.name}
+              className="w-full h-48 object-cover rounded-md"
+              onError={() => {
+                console.error("Failed to load church photo");
+                setImageError(true);
+                toast({
+                  title: "Photo Error",
+                  description: "Could not load the church photo. Showing placeholder instead.",
+                  variant: "destructive",
+                });
+              }}
+            />
+          ) : (
+            <FallbackImage />
+          )}
+        </div>
 
         <Separator className="my-4" />
 

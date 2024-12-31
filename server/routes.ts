@@ -8,10 +8,6 @@ if (!process.env.GOOGLE_MAPS_API_KEY) {
   throw new Error("GOOGLE_MAPS_API_KEY environment variable is required");
 }
 
-if (!process.env.GOOGLE_CUSTOM_SEARCH_API_KEY || !process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID) {
-  throw new Error("GOOGLE_CUSTOM_SEARCH_API_KEY and GOOGLE_CUSTOM_SEARCH_ENGINE_ID are required for church photos");
-}
-
 export function registerRoutes(app: Express): Server {
   // Google Maps API endpoints
   app.get("/api/maps/script", (_req, res) => {
@@ -25,75 +21,38 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // New endpoint for church photos using Google Custom Search
-  app.get("/api/churches/photos/:churchName", async (req, res) => {
+  // Places Photo endpoint
+  app.get("/api/maps/photo/:reference", async (req, res) => {
     try {
-      const { churchName } = req.params;
-      console.log("Fetching photo for church:", churchName);
-
-      if (!churchName) {
-        console.error("No church name provided");
-        return res.status(400).json({ error: "Church name is required" });
+      const { reference } = req.params;
+      if (!reference) {
+        return res.status(400).json({ error: "Photo reference is required" });
       }
 
-      // Clean up the search query to be more specific
-      const searchQuery = `${churchName} church building exterior site:google.com`;
-      console.log("Search query:", searchQuery);
+      console.log("Fetching photo for reference:", reference);
+      const maxwidth = req.query.maxwidth || 400;
+      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
-      const url = `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&cx=${process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID}&key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&searchType=image&num=1&safe=active`;
-
-      console.log("Making request to Google Custom Search API");
       const response = await fetch(url);
-      const data = await response.json();
 
       if (!response.ok) {
-        console.error("Google Custom Search API error:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: data.error
-        });
-        return res.status(response.status).json({ 
-          error: "Failed to fetch church photo",
-          details: data.error?.message || "Unknown error",
-          status: response.status
-        });
+        console.error("Google Places photo error:", response.status, response.statusText);
+        return res.status(response.status).json({ error: "Failed to fetch photo from Google Places" });
       }
 
-      if (!data.items?.[0]?.link) {
-        console.log("No photos found for church:", churchName);
-        if (data.error) {
-          console.error("API response error:", data.error);
-        }
-        return res.status(404).json({ 
-          error: "No photos found",
-          details: "No suitable images were found for this church"
-        });
-      }
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
-      const imageUrl = data.items[0].link;
-      console.log("Found photo URL:", imageUrl);
+      // Set appropriate headers
+      const contentType = response.headers.get('content-type');
+      res.set('Content-Type', contentType || 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
-      // Verify the image URL is accessible
-      try {
-        const imageResponse = await fetch(imageUrl, { method: 'HEAD' });
-        if (!imageResponse.ok) {
-          throw new Error(`Image URL returned status ${imageResponse.status}`);
-        }
-      } catch (error) {
-        console.error("Image URL verification failed:", error);
-        return res.status(404).json({ 
-          error: "Invalid image URL",
-          details: "The found image URL is not accessible"
-        });
-      }
-
-      res.json({ imageUrl });
+      // Send the buffer directly
+      res.send(buffer);
     } catch (error) {
       console.error("Photo fetch error:", error);
-      res.status(500).json({ 
-        error: "Failed to fetch photo",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
+      res.status(500).json({ error: "Failed to fetch photo" });
     }
   });
 
@@ -222,14 +181,12 @@ export function registerRoutes(app: Express): Server {
         .map(r => r.denomination)
         .filter((d): d is string => d != null && d !== "");
 
-      // Convert Set to Array before sending response
       res.json(Array.from(new Set(denominations)));
     } catch (error) {
       console.error("Error fetching denominations:", error);
       res.status(500).json({ error: "Failed to fetch denominations" });
     }
   });
-
 
   // Add new endpoint for church reviews
   app.post("/api/churches/:churchId/reviews", async (req, res) => {
@@ -250,39 +207,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/maps/photo/:reference", async (req, res) => {
-    try {
-      const { reference } = req.params;
-      if (!reference) {
-        return res.status(400).json({ error: "Photo reference is required" });
-      }
-
-      console.log("Fetching photo for reference:", reference);
-      const maxwidth = req.query.maxwidth || 400;
-      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${encodeURIComponent(reference)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        console.error("Google Places photo error:", response.status, response.statusText);
-        return res.status(response.status).json({ error: "Failed to fetch photo from Google Places" });
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Set appropriate headers
-      const contentType = response.headers.get('content-type');
-      res.set('Content-Type', contentType || 'image/jpeg');
-      res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-
-      // Send the buffer directly
-      res.send(buffer);
-    } catch (error) {
-      console.error("Photo fetch error:", error);
-      res.status(500).json({ error: "Failed to fetch photo" });
-    }
-  });
   const httpServer = createServer(app);
   return httpServer;
 }
