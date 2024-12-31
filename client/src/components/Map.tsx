@@ -152,8 +152,13 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
         searchChurches(map);
       });
 
-      // Try to get user's location immediately
+      // Try to get user's location in a more user-friendly way
       if (navigator.geolocation) {
+        toast({
+          title: "Location Access",
+          description: "Please allow location access to find churches near you.",
+        });
+
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const userLocation = {
@@ -162,21 +167,52 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
             };
             map.setCenter(userLocation);
             map.setZoom(14);
-          },
-          () => {
-            // If geolocation fails, use default center (already set)
+
             toast({
-              title: "Location Access Denied",
-              description: "Using default location. Click 'My Location' to try again.",
-              variant: "destructive",
+              title: "Success",
+              description: "Found your location! Showing nearby churches.",
             });
+          },
+          (error) => {
+            let errorMessage = "Unable to get your location. ";
+
+            switch(error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage += "You can use the 'My Location' button to try again when ready.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage += "Location information is unavailable.";
+                break;
+              case error.TIMEOUT:
+                errorMessage += "Location request timed out.";
+                break;
+              default:
+                errorMessage += "An unknown error occurred.";
+            }
+
+            toast({
+              title: "Location Access",
+              description: errorMessage,
+              variant: "secondary",
+            });
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
           }
         );
+      } else {
+        toast({
+          title: "Location Services Unavailable",
+          description: "Your browser doesn't support geolocation. You can still browse the map manually.",
+          variant: "secondary",
+        });
       }
     } catch (error) {
       console.error("Error initializing map:", error);
       toast({
-        title: "Error",
+        title: "Map Error",
         description: "Failed to initialize the map. Please refresh the page.",
         variant: "destructive",
       });
