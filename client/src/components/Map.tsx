@@ -12,18 +12,7 @@ interface MapProps {
 // Define Google Maps types
 declare global {
   interface Window {
-    google: {
-      maps: {
-        Map: typeof google.maps.Map;
-        Marker: typeof google.maps.Marker;
-        SymbolPath: typeof google.maps.SymbolPath;
-        places: {
-          PlacesService: typeof google.maps.places.PlacesService;
-          PlacesServiceStatus: typeof google.maps.places.PlacesServiceStatus;
-          PlaceResult: typeof google.maps.places.PlaceResult;
-        };
-      };
-    };
+    google: any;
     initMap: () => void;
   }
 }
@@ -34,8 +23,8 @@ interface MapConfig {
 
 export default function Map({ onChurchSelect, selectedDenomination }: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
   const { toast } = useToast();
 
   const { data: mapConfig, isLoading, isError, error } = useQuery<MapConfig>({
@@ -43,7 +32,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
     retry: false,
   });
 
-  const searchChurches = useCallback((map: google.maps.Map) => {
+  const searchChurches = useCallback((map: any) => {
     const service = new window.google.maps.places.PlacesService(map);
     const bounds = map.getBounds();
     if (!bounds) return;
@@ -55,10 +44,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
 
     service.nearbySearch(
       request,
-      async (
-        results: google.maps.places.PlaceResult[] | null,
-        status: google.maps.places.PlacesServiceStatus
-      ) => {
+      async (results: any, status: any) => {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
           // Clear existing markers
           markersRef.current.forEach((marker) => marker.setMap(null));
@@ -114,7 +100,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
                           lng: place.geometry!.location!.lng(),
                         },
                       },
-                      photos: place.photos?.map((photo) => ({
+                      photos: place.photos?.map((photo: any) => ({
                         photo_reference: photo.getUrl() || "",
                       })),
                     };
@@ -143,8 +129,11 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
     if (!mapRef.current || !window.google?.maps) return;
 
     try {
+      // Start with Sydney as default center
+      const defaultCenter = { lat: -33.8688, lng: 151.2093 };
+
       const map = new window.google.maps.Map(mapRef.current, {
-        center: { lat: 40.7128, lng: -74.006 },
+        center: defaultCenter,
         zoom: 13,
         styles: [
           {
@@ -169,7 +158,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
         searchChurches(map);
       });
 
-      // Try to get user's location
+      // Try to get user's location immediately
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -181,7 +170,12 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
             map.setZoom(14);
           },
           () => {
-            // Using default location (already set)
+            // If geolocation fails, use default center (already set)
+            toast({
+              title: "Location Access Denied",
+              description: "Using default location. Click 'My Location' to try again.",
+              variant: "destructive",
+            });
           }
         );
       }
