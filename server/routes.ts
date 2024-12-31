@@ -30,7 +30,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const maxwidth = req.query.maxwidth || 400;
-      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${encodeURIComponent(reference)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${reference}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
       const response = await fetch(url);
 

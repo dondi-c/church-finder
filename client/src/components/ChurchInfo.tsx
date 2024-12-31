@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -8,17 +9,16 @@ import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import ServiceTimeForm from "./ServiceTimeForm";
 import ChurchDetailsForm from "./ChurchDetailsForm";
+import ReviewForm from "./ReviewForm";
 import { ChurchDetails, ServiceTime } from "@/types/church";
 import { useToast } from "@/hooks/use-toast";
-import ReviewForm from "./ReviewForm";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
+
+const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 interface ChurchInfoProps {
   church: Church | null;
 }
-
-const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function ChurchInfo({ church }: ChurchInfoProps) {
   const { toast } = useToast();
@@ -157,10 +157,10 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           </p>
         )}
 
-        {church.photos?.[0] && !photoError && (
+        {church.photos?.[0]?.photo_reference && !photoError && (
           <div className="mt-4 relative">
             <img
-              src={church.photos[0].photo_reference}
+              src={`/api/maps/photo/${encodeURIComponent(church.photos[0].photo_reference)}`}
               alt={church.name}
               className="w-full h-48 object-cover rounded-md"
               onError={handleImageError}

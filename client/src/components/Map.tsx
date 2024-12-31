@@ -64,7 +64,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
       (error) => {
         let errorMessage = "Unable to get your location. ";
 
-        switch(error.code) {
+        switch (error.code) {
           case error.PERMISSION_DENIED:
             errorMessage = "Location permission was denied. To enable location access:\n1. Click the location icon in your browser's address bar\n2. Select 'Allow' for this site\n3. Refresh the page";
             break;
@@ -84,7 +84,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 0,
       }
     );
   }, [toast]);
@@ -109,9 +109,9 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
           try {
             if (!place.geometry?.location || !place.place_id) continue;
 
-            // Ensure we capture photo references if available
+            // Get photo references directly from the place result
             const photos = place.photos?.slice(0, 1).map((photo: any) => ({
-              photo_reference: photo.getUrl({ maxWidth: 400 }),
+              photo_reference: photo.photo_reference,
             })) || [];
 
             // Fetch church details to check denomination
@@ -157,13 +157,13 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
                 name: place.name,
                 vicinity: place.vicinity,
                 rating: place.rating,
+                photos,
                 geometry: {
                   location: {
                     lat: place.geometry.location.lat(),
                     lng: place.geometry.location.lng(),
                   },
                 },
-                photos,
               };
 
               onChurchSelect(church);
@@ -209,7 +209,6 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
       });
 
       requestLocation(map);
-
     } catch (error) {
       console.error("Error initializing map:", error);
       toast({
