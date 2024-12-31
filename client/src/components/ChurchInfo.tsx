@@ -30,6 +30,12 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
     enabled: !!church?.place_id,
   });
 
+  // New query for church photo
+  const { data: photoData } = useQuery<{ imageUrl: string }>({
+    queryKey: [`/api/churches/photos/${encodeURIComponent(church?.name || '')}`],
+    enabled: !!church?.name && !photoError,
+  });
+
   const handleGetDirections = () => {
     if (church?.geometry?.location) {
       const { lat, lng } = church.geometry.location;
@@ -150,11 +156,11 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           </p>
         )}
 
-        {church.photos?.[0]?.photo_reference ? (
-          <div className="mt-4 relative">
-            {!photoError ? (
+        {church.name && (
+          <div className="mt-4">
+            {!photoError && photoData?.imageUrl ? (
               <img
-                src={`/api/maps/photo/${encodeURIComponent(church.photos[0].photo_reference)}`}
+                src={photoData.imageUrl}
                 alt={church.name}
                 className="w-full h-48 object-cover rounded-md"
                 onError={(e) => {
@@ -171,11 +177,8 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
               <FallbackImage />
             )}
           </div>
-        ) : (
-          <div className="mt-4">
-            <FallbackImage />
-          </div>
         )}
+
 
         <Separator className="my-4" />
 
