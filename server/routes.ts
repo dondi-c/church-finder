@@ -88,6 +88,34 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.patch("/api/churches/:id", async (req, res) => {
+    try {
+      const churchId = parseInt(req.params.id);
+      const { phone, website, denomination, description } = req.body;
+
+      const [updatedChurch] = await db
+        .update(churches)
+        .set({
+          phone,
+          website,
+          denomination,
+          description,
+        })
+        .where(eq(churches.id, churchId))
+        .returning();
+
+      if (!updatedChurch) {
+        res.status(404).json({ error: "Church not found" });
+        return;
+      }
+
+      res.json(updatedChurch);
+    } catch (error) {
+      console.error("Error updating church:", error);
+      res.status(400).json({ error: "Invalid church data" });
+    }
+  });
+
   app.post("/api/churches/:churchId/service-times", async (req, res) => {
     try {
       const serviceTimeData = insertServiceTimeSchema.parse({
