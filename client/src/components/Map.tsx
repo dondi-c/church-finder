@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface MapProps {
   onChurchSelect: (church: Church) => void;
+  selectedDenomination: string | null;
 }
 
 // Define Google Maps types
@@ -31,7 +32,7 @@ interface MapConfig {
   apiKey: string;
 }
 
-export default function Map({ onChurchSelect }: MapProps) {
+export default function Map({ onChurchSelect, selectedDenomination }: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -54,7 +55,7 @@ export default function Map({ onChurchSelect }: MapProps) {
 
     service.nearbySearch(
       request,
-      (
+      async (
         results: google.maps.places.PlaceResult[] | null,
         status: google.maps.places.PlacesServiceStatus
       ) => {
@@ -63,73 +64,80 @@ export default function Map({ onChurchSelect }: MapProps) {
           markersRef.current.forEach((marker) => marker.setMap(null));
           markersRef.current = [];
 
-          results.forEach((place) => {
+          for (const place of results) {
             if (place.geometry?.location && place.place_id) {
-              const marker = new window.google.maps.Marker({
-                map,
-                position: place.geometry.location,
-                title: place.name,
-                icon: {
-                  path: window.google.maps.SymbolPath.CIRCLE,
-                  scale: 8,
-                  fillColor: "#4f46e5",
-                  fillOpacity: 1,
-                  strokeWeight: 2,
-                  strokeColor: "#ffffff",
-                },
-              });
-
-              marker.addListener("click", () => {
-                if (place.place_id && place.name && place.vicinity) {
-                  const church: Church = {
-                    place_id: place.place_id,
-                    name: place.name,
-                    vicinity: place.vicinity,
-                    rating: place.rating,
-                    geometry: {
-                      location: {
-                        lat: place.geometry!.location!.lat(),
-                        lng: place.geometry!.location!.lng(),
-                      },
-                    },
-                    photos: place.photos?.map((photo) => ({
-                      photo_reference: photo.getUrl() || '',
-                    })),
-                  };
-
-                  // Create/fetch church in database before selecting
-                  fetch(`/api/churches/${place.place_id}?${new URLSearchParams({
-                    name: place.name,
-                    vicinity: place.vicinity,
-                    lat: place.geometry!.location!.lat().toString(),
-                    lng: place.geometry!.location!.lng().toString(),
+              try {
+                // Fetch church details to check denomination
+                const response = await fetch(
+                  `/api/churches/${place.place_id}?${new URLSearchParams({
+                    name: place.name || "",
+                    vicinity: place.vicinity || "",
+                    lat: place.geometry.location.lat().toString(),
+                    lng: place.geometry.location.lng().toString(),
                     rating: place.rating?.toString() || "",
-                  })}`)
-                    .then(res => {
-                      if (!res.ok) throw new Error("Failed to fetch church");
-                      return res.json();
-                    })
-                    .then(() => {
-                      onChurchSelect(church);
-                    })
-                    .catch(error => {
-                      console.error("Error fetching church:", error);
-                      toast({
-                        title: "Error",
-                        description: "Failed to load church details",
-                        variant: "destructive",
-                      });
-                    });
-                }
-              });
+                  })}`
+                );
 
-              markersRef.current.push(marker);
+                if (!response.ok) continue;
+
+                const churchData = await response.json();
+
+                // Skip if denomination filter is active and doesn't match
+                if (selectedDenomination && churchData.denomination !== selectedDenomination) {
+                  continue;
+                }
+
+                const marker = new window.google.maps.Marker({
+                  map,
+                  position: place.geometry.location,
+                  title: place.name,
+                  icon: {
+                    path: window.google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#4f46e5",
+                    fillOpacity: 1,
+                    strokeWeight: 2,
+                    strokeColor: "#ffffff",
+                  },
+                });
+
+                marker.addListener("click", () => {
+                  if (place.place_id && place.name && place.vicinity) {
+                    const church: Church = {
+                      place_id: place.place_id,
+                      name: place.name,
+                      vicinity: place.vicinity,
+                      rating: place.rating,
+                      geometry: {
+                        location: {
+                          lat: place.geometry!.location!.lat(),
+                          lng: place.geometry!.location!.lng(),
+                        },
+                      },
+                      photos: place.photos?.map((photo) => ({
+                        photo_reference: photo.getUrl() || "",
+                      })),
+                    };
+
+                    onChurchSelect(church);
+                  }
+                });
+
+                markersRef.current.push(marker);
+              } catch (error) {
+                console.error("Error fetching church details:", error);
+                toast({
+                  title: "Error",
+                  description: "Failed to load church details",
+                  variant: "destructive",
+                });
+              }
             }
-          });
+          }
         }
       }
     );
-  }, [onChurchSelect, toast]);
+  }, [onChurchSelect, selectedDenomination, toast]);
 
   const initializeMap = useCallback(() => {
     if (!mapRef.current || !window.google?.maps) return;

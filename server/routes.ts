@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { Readable } from "stream";
 import { db } from "@db";
 import { churches, serviceTimes, insertChurchSchema, insertServiceTimeSchema } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 if (!process.env.GOOGLE_MAPS_API_KEY) {
   throw new Error("GOOGLE_MAPS_API_KEY environment variable is required");
@@ -148,6 +148,27 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: "Failed to fetch churches" });
     }
   });
+
+  // Add new endpoint for denominations
+  app.get("/api/churches/denominations", async (_req, res) => {
+    try {
+      const result = await db
+        .select({ denomination: churches.denomination })
+        .from(churches)
+        .where(eq(churches.denomination, churches.denomination))
+        .orderBy(desc(churches.denomination));
+
+      const denominations = result
+        .map(r => r.denomination)
+        .filter((d): d is string => d != null && d !== "");
+
+      res.json([...new Set(denominations)]);
+    } catch (error) {
+      console.error("Error fetching denominations:", error);
+      res.status(500).json({ error: "Failed to fetch denominations" });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

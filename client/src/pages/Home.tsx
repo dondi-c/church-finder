@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import Map from "@/components/Map";
 import ChurchInfo from "@/components/ChurchInfo";
+import DenominationFilter from "@/components/DenominationFilter";
 import { Button } from "@/components/ui/button";
 import { Loader2, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export type Church = {
 
 export default function Home() {
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
+  const [selectedDenomination, setSelectedDenomination] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const { toast } = useToast();
 
@@ -77,21 +79,26 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <Card className="relative overflow-hidden h-[600px]">
-              <Map onChurchSelect={setSelectedChurch} />
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute top-4 right-4 z-10"
-                onClick={handleLocationClick}
-                disabled={isLocating}
-              >
-                {isLocating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <MapPin className="mr-2 h-4 w-4" />
-                )}
-                {isLocating ? "Locating..." : "My Location"}
-              </Button>
+              <Map 
+                onChurchSelect={setSelectedChurch} 
+                selectedDenomination={selectedDenomination}
+              />
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
+                <DenominationFilter onSelect={setSelectedDenomination} />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleLocationClick}
+                  disabled={isLocating}
+                >
+                  {isLocating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <MapPin className="mr-2 h-4 w-4" />
+                  )}
+                  {isLocating ? "Locating..." : "My Location"}
+                </Button>
+              </div>
             </Card>
           </div>
 
