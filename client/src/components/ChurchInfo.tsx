@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Church } from "../pages/Home";
-import { MapPin, Star, Clock, Globe, Phone, Plus, Edit2 } from "lucide-react";
+import { MapPin, Star, Clock, Globe, Phone, Plus, Edit2, Navigation } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
@@ -25,14 +25,17 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
   const { data: churchDetails, isError } = useQuery<ChurchDetails>({
     queryKey: [`/api/churches/${church?.place_id}`],
     enabled: !!church?.place_id,
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load church details",
-        variant: "destructive",
-      });
-    },
   });
+
+  const handleGetDirections = () => {
+    if (church?.geometry?.location) {
+      const { lat, lng } = church.geometry.location;
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+        '_blank'
+      );
+    }
+  };
 
   if (!church) {
     return (
@@ -62,22 +65,32 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xl font-bold">{church.name}</CardTitle>
-        {churchDetails && (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit Details
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Church Details</DialogTitle>
-              </DialogHeader>
-              <ChurchDetailsForm church={churchDetails} />
-            </DialogContent>
-          </Dialog>
-        )}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGetDirections}
+          >
+            <Navigation className="h-4 w-4 mr-2" />
+            Get Directions
+          </Button>
+          {churchDetails && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit Details
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Church Details</DialogTitle>
+                </DialogHeader>
+                <ChurchDetailsForm church={churchDetails} />
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start gap-2">
