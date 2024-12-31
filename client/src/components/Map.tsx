@@ -92,8 +92,6 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
   const searchChurches = useCallback((map: any) => {
     const service = new window.google.maps.places.PlacesService(map);
     const bounds = map.getBounds();
-    if (!bounds) return;
-
     const request = {
       bounds,
       type: "church",
@@ -108,6 +106,11 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
         for (const place of results) {
           try {
             if (!place.geometry?.location || !place.place_id) continue;
+
+            // Get photo references before they expire
+            const photos = place.photos?.map((photo: any) => ({
+              photo_reference: photo.photo_reference,
+            }));
 
             // Fetch church details to check denomination
             const response = await fetch(
@@ -158,9 +161,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
                     lng: place.geometry.location.lng(),
                   },
                 },
-                photos: place.photos?.map((photo: any) => ({
-                  photo_reference: photo.photo_reference,
-                })),
+                photos: photos,
               };
 
               onChurchSelect(church);
@@ -181,7 +182,6 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
     if (!mapRef.current || !window.google?.maps) return;
 
     try {
-      // Start with Sydney as default center
       const defaultCenter = { lat: -33.8688, lng: 151.2093 };
 
       const map = new window.google.maps.Map(mapRef.current, {
@@ -197,7 +197,6 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
 
       mapInstanceRef.current = map;
 
-      // Add custom event listener for centering
       mapRef.current.addEventListener("setCenter", ((
         e: CustomEvent<{ lat: number; lng: number }>
       ) => {
@@ -205,7 +204,6 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
         map.setZoom(14);
       }) as EventListener);
 
-      // Search for churches when map becomes idle
       map.addListener("idle", () => {
         searchChurches(map);
       });
@@ -227,13 +225,11 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
 
     const loadGoogleMaps = async () => {
       try {
-        // If Google Maps is already loaded, initialize the map
         if (window.google?.maps) {
           initializeMap();
           return;
         }
 
-        // Load Google Maps script
         const script = document.createElement("script");
         script.src = `https://maps.googleapis.com/maps/api/js?key=${mapConfig.apiKey}&libraries=places`;
         script.async = true;
@@ -258,10 +254,8 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
 
     loadGoogleMaps();
 
-    // Cleanup function
     return () => {
       if (mapInstanceRef.current) {
-        // Clear all markers
         markersRef.current.forEach((marker) => marker.setMap(null));
         markersRef.current = [];
       }
