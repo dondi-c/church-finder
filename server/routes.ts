@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { Readable } from "stream";
 import { db } from "@db";
 import { churches, serviceTimes, reviews, insertChurchSchema, insertServiceTimeSchema, insertReviewSchema } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -22,43 +21,34 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-app.get("/api/maps/photo/:reference", async (req, res) => {
+  app.get("/api/maps/photo/:reference", async (req, res) => {
     try {
       const { reference } = req.params;
       if (!reference) {
         return res.status(400).json({ error: "Photo reference is required" });
       }
 
-      console.log("Fetching photo with reference:", reference);
+      console.log("Fetching photo for reference:", reference);
       const maxwidth = req.query.maxwidth || 400;
       const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${encodeURIComponent(reference)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
-      console.log("Requesting photo from URL:", url.replace(process.env.GOOGLE_MAPS_API_KEY!, 'REDACTED'));
       const response = await fetch(url);
 
       if (!response.ok) {
         console.error("Google Places photo error:", response.status, response.statusText);
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-        return res.status(response.status).json({ 
-          error: "Failed to fetch photo from Google Places",
-          details: errorText
-        });
+        return res.status(response.status).json({ error: "Failed to fetch photo from Google Places" });
       }
 
-      // Set appropriate headers from the Google response
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Set appropriate headers
       const contentType = response.headers.get('content-type');
-      console.log("Received content-type:", contentType);
       res.set('Content-Type', contentType || 'image/jpeg');
       res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
 
-      // Stream the response directly
-      if (response.body) {
-        const readable = Readable.fromWeb(response.body);
-        readable.pipe(res);
-      } else {
-        throw new Error("No response body received");
-      }
+      // Send the buffer directly
+      res.send(buffer);
     } catch (error) {
       console.error("Photo fetch error:", error);
       res.status(500).json({ error: "Failed to fetch photo" });
