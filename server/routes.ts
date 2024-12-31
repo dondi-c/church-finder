@@ -42,17 +42,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Church Management API endpoints
-  app.get("/api/churches", async (_req, res) => {
+  app.post("/api/churches", async (req, res) => {
     try {
-      const allChurches = await db.query.churches.findMany({
-        with: {
-          serviceTimes: true,
-        },
-      });
-      res.json(allChurches);
+      const churchData = insertChurchSchema.parse(req.body);
+      const [church] = await db.insert(churches).values(churchData).returning();
+      res.status(201).json(church);
     } catch (error) {
-      console.error("Error fetching churches:", error);
-      res.status(500).json({ error: "Failed to fetch churches" });
+      console.error("Error creating church:", error);
+      res.status(400).json({ error: "Invalid church data" });
     }
   });
 
@@ -66,7 +63,22 @@ export function registerRoutes(app: Express): Server {
       });
 
       if (!church) {
-        res.status(404).json({ error: "Church not found" });
+        // If church doesn't exist in our database, create it
+        const [newChurch] = await db.insert(churches)
+          .values({
+            place_id: req.params.placeId,
+            name: req.query.name as string,
+            vicinity: req.query.vicinity as string,
+            lat: req.query.lat as string,
+            lng: req.query.lng as string,
+            rating: req.query.rating as string || null,
+          })
+          .returning();
+
+        res.json({
+          ...newChurch,
+          serviceTimes: [],
+        });
         return;
       }
 
@@ -74,17 +86,6 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching church:", error);
       res.status(500).json({ error: "Failed to fetch church details" });
-    }
-  });
-
-  app.post("/api/churches", async (req, res) => {
-    try {
-      const churchData = insertChurchSchema.parse(req.body);
-      const [church] = await db.insert(churches).values(churchData).returning();
-      res.status(201).json(church);
-    } catch (error) {
-      console.error("Error creating church:", error);
-      res.status(400).json({ error: "Invalid church data" });
     }
   });
 
@@ -131,6 +132,20 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error creating service time:", error);
       res.status(400).json({ error: "Invalid service time data" });
+    }
+  });
+
+  app.get("/api/churches", async (_req, res) => {
+    try {
+      const allChurches = await db.query.churches.findMany({
+        with: {
+          serviceTimes: true,
+        },
+      });
+      res.json(allChurches);
+    } catch (error) {
+      console.error("Error fetching churches:", error);
+      res.status(500).json({ error: "Failed to fetch churches" });
     }
   });
 

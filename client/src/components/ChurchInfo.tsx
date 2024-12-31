@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import ServiceTimeForm from "./ServiceTimeForm";
 import ChurchDetailsForm from "./ChurchDetailsForm";
 import { ChurchDetails, ServiceTime } from "@/types/church";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChurchInfoProps {
   church: Church | null;
@@ -17,9 +18,18 @@ interface ChurchInfoProps {
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function ChurchInfo({ church }: ChurchInfoProps) {
-  const { data: churchDetails } = useQuery<ChurchDetails>({
+  const { toast } = useToast();
+
+  const { data: churchDetails, isError } = useQuery<ChurchDetails>({
     queryKey: [`/api/churches/${church?.place_id}`],
     enabled: !!church?.place_id,
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to load church details",
+        variant: "destructive",
+      });
+    },
   });
 
   if (!church) {
@@ -28,6 +38,18 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
         <CardHeader>
           <CardTitle className="text-muted-foreground">
             Select a church to see details
+          </CardTitle>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-destructive">
+            Error loading church details
           </CardTitle>
         </CardHeader>
       </Card>
@@ -65,7 +87,7 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           <div className="flex items-center gap-1">
             <Star className="h-5 w-5 text-yellow-400 fill-current" />
             <span className="text-sm font-medium">
-              {church.rating.toFixed(1)}
+              {Number(church.rating).toFixed(1)}
             </span>
           </div>
         )}
@@ -103,6 +125,12 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           </p>
         )}
 
+        {churchDetails?.description && (
+          <p className="text-sm text-muted-foreground">
+            {churchDetails.description}
+          </p>
+        )}
+
         {church.photos?.[0] && (
           <div className="mt-4">
             <img
@@ -114,6 +142,7 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
         )}
 
         <Separator className="my-4" />
+
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold flex items-center gap-2">

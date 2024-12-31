@@ -8,12 +8,27 @@ interface MapProps {
   onChurchSelect: (church: Church) => void;
 }
 
-// Add proper type declarations for Google Maps
+// Define Google Maps types
 declare global {
   interface Window {
-    google: typeof google;
+    google: {
+      maps: {
+        Map: typeof google.maps.Map;
+        Marker: typeof google.maps.Marker;
+        SymbolPath: typeof google.maps.SymbolPath;
+        places: {
+          PlacesService: typeof google.maps.places.PlacesService;
+          PlacesServiceStatus: typeof google.maps.places.PlacesServiceStatus;
+          PlaceResult: typeof google.maps.places.PlaceResult;
+        };
+      };
+    };
     initMap: () => void;
   }
+}
+
+interface MapConfig {
+  apiKey: string;
 }
 
 export default function Map({ onChurchSelect }: MapProps) {
@@ -22,13 +37,13 @@ export default function Map({ onChurchSelect }: MapProps) {
   const markersRef = useRef<google.maps.Marker[]>([]);
   const { toast } = useToast();
 
-  const { data: mapConfig, isLoading, isError, error } = useQuery({
+  const { data: mapConfig, isLoading, isError, error } = useQuery<MapConfig>({
     queryKey: ["/api/maps/script"],
     retry: false,
   });
 
   const searchChurches = useCallback((map: google.maps.Map) => {
-    const service = new google.maps.places.PlacesService(map);
+    const service = new window.google.maps.places.PlacesService(map);
     const bounds = map.getBounds();
     if (!bounds) return;
 
@@ -40,22 +55,22 @@ export default function Map({ onChurchSelect }: MapProps) {
     service.nearbySearch(
       request,
       (
-        results: google.maps.places.PlaceResult[],
+        results: google.maps.places.PlaceResult[] | null,
         status: google.maps.places.PlacesServiceStatus
       ) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
           // Clear existing markers
           markersRef.current.forEach((marker) => marker.setMap(null));
           markersRef.current = [];
 
           results.forEach((place) => {
-            if (place.geometry?.location) {
-              const marker = new google.maps.Marker({
+            if (place.geometry?.location && place.place_id) {
+              const marker = new window.google.maps.Marker({
                 map,
                 position: place.geometry.location,
                 title: place.name,
                 icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
+                  path: window.google.maps.SymbolPath.CIRCLE,
                   scale: 8,
                   fillColor: "#4f46e5",
                   fillOpacity: 1,
@@ -66,7 +81,7 @@ export default function Map({ onChurchSelect }: MapProps) {
 
               marker.addListener("click", () => {
                 if (place.place_id && place.name && place.vicinity) {
-                  onChurchSelect({
+                  const church: Church = {
                     place_id: place.place_id,
                     name: place.name,
                     vicinity: place.vicinity,
@@ -78,9 +93,33 @@ export default function Map({ onChurchSelect }: MapProps) {
                       },
                     },
                     photos: place.photos?.map((photo) => ({
-                      photo_reference: photo.getUrl(),
+                      photo_reference: photo.getUrl() || '',
                     })),
-                  });
+                  };
+
+                  // Create/fetch church in database before selecting
+                  fetch(`/api/churches/${place.place_id}?${new URLSearchParams({
+                    name: place.name,
+                    vicinity: place.vicinity,
+                    lat: place.geometry!.location!.lat().toString(),
+                    lng: place.geometry!.location!.lng().toString(),
+                    rating: place.rating?.toString() || "",
+                  })}`)
+                    .then(res => {
+                      if (!res.ok) throw new Error("Failed to fetch church");
+                      return res.json();
+                    })
+                    .then(() => {
+                      onChurchSelect(church);
+                    })
+                    .catch(error => {
+                      console.error("Error fetching church:", error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to load church details",
+                        variant: "destructive",
+                      });
+                    });
                 }
               });
 
@@ -90,7 +129,7 @@ export default function Map({ onChurchSelect }: MapProps) {
         }
       }
     );
-  }, [onChurchSelect]);
+  }, [onChurchSelect, toast]);
 
   const initializeMap = useCallback(() => {
     if (!mapRef.current || !window.google?.maps) return;
