@@ -13,6 +13,7 @@ import ReviewForm from "./ReviewForm";
 import { ChurchDetails, ServiceTime } from "@/types/church";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { FallbackImage } from "@/components/ui/fallback-image";
 
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -149,22 +150,30 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           </p>
         )}
 
-        {church.photos?.[0]?.photo_reference && !photoError && (
+        {church.photos?.[0]?.photo_reference ? (
           <div className="mt-4 relative">
-            <img
-              src={`/api/maps/photo/${encodeURIComponent(church.photos[0].photo_reference)}`}
-              alt={church.name}
-              className="w-full h-48 object-cover rounded-md"
-              onError={(e) => {
-                console.error("Failed to load church photo");
-                setPhotoError(true);
-                toast({
-                  title: "Photo Error",
-                  description: "Could not load church photo. Please try again later.",
-                  variant: "destructive",
-                });
-              }}
-            />
+            {!photoError ? (
+              <img
+                src={`/api/maps/photo/${encodeURIComponent(church.photos[0].photo_reference)}`}
+                alt={church.name}
+                className="w-full h-48 object-cover rounded-md"
+                onError={(e) => {
+                  console.error("Failed to load church photo");
+                  setPhotoError(true);
+                  toast({
+                    title: "Photo Error",
+                    description: "Could not load the church photo. Showing placeholder instead.",
+                    variant: "destructive",
+                  });
+                }}
+              />
+            ) : (
+              <FallbackImage />
+            )}
+          </div>
+        ) : (
+          <div className="mt-4">
+            <FallbackImage />
           </div>
         )}
 
