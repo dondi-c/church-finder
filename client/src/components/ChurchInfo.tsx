@@ -31,10 +31,18 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
   });
 
   // Query for church photo
-  const { data: photoData } = useQuery<{ imageUrl: string }>({
+  const { data: photoData, isError: photoError, error: photoQueryError } = useQuery<{ imageUrl: string }>({
     queryKey: [`/api/churches/photos/${encodeURIComponent(church?.name || '')}`],
     enabled: !!church?.name,
     retry: 1,
+    onError: (error) => {
+      console.error("Failed to fetch church photo:", error);
+      toast({
+        title: "Photo Error",
+        description: "Could not load the church photo. Showing placeholder instead.",
+        variant: "destructive",
+      });
+    }
   });
 
   const handleGetDirections = () => {

@@ -36,30 +36,58 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Church name is required" });
       }
 
-      const searchQuery = `${churchName} church building exterior`;
+      // Clean up the search query to be more specific
+      const searchQuery = `${churchName} church building exterior site:google.com`;
       console.log("Search query:", searchQuery);
 
-      const url = `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&cx=${process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID}&key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&searchType=image&num=1`;
+      const url = `https://customsearch.googleapis.com/customsearch/v1?q=${encodeURIComponent(searchQuery)}&cx=${process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID}&key=${process.env.GOOGLE_CUSTOM_SEARCH_API_KEY}&searchType=image&num=1&safe=active`;
 
       console.log("Making request to Google Custom Search API");
       const response = await fetch(url);
       const data = await response.json();
 
       if (!response.ok) {
-        console.error("Google Custom Search error:", data);
+        console.error("Google Custom Search API error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error
+        });
         return res.status(response.status).json({ 
           error: "Failed to fetch church photo",
-          details: data.error?.message || "Unknown error"
+          details: data.error?.message || "Unknown error",
+          status: response.status
         });
       }
 
       if (!data.items?.[0]?.link) {
         console.log("No photos found for church:", churchName);
-        return res.status(404).json({ error: "No photos found" });
+        if (data.error) {
+          console.error("API response error:", data.error);
+        }
+        return res.status(404).json({ 
+          error: "No photos found",
+          details: "No suitable images were found for this church"
+        });
       }
 
-      console.log("Found photo URL:", data.items[0].link);
-      res.json({ imageUrl: data.items[0].link });
+      const imageUrl = data.items[0].link;
+      console.log("Found photo URL:", imageUrl);
+
+      // Verify the image URL is accessible
+      try {
+        const imageResponse = await fetch(imageUrl, { method: 'HEAD' });
+        if (!imageResponse.ok) {
+          throw new Error(`Image URL returned status ${imageResponse.status}`);
+        }
+      } catch (error) {
+        console.error("Image URL verification failed:", error);
+        return res.status(404).json({ 
+          error: "Invalid image URL",
+          details: "The found image URL is not accessible"
+        });
+      }
+
+      res.json({ imageUrl });
     } catch (error) {
       console.error("Photo fetch error:", error);
       res.status(500).json({ 
