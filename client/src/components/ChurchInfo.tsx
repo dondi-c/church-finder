@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import ServiceTimeForm from "./ServiceTimeForm";
+import { ChurchDetails, ServiceTime } from "@/types/church";
 
 interface ChurchInfoProps {
   church: Church | null;
@@ -15,7 +16,7 @@ interface ChurchInfoProps {
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function ChurchInfo({ church }: ChurchInfoProps) {
-  const { data: churchDetails } = useQuery({
+  const { data: churchDetails } = useQuery<ChurchDetails>({
     queryKey: [`/api/churches/${church?.place_id}`],
     enabled: !!church?.place_id,
   });
@@ -121,7 +122,7 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
           </div>
 
           {churchDetails?.serviceTimes && churchDetails.serviceTimes.length > 0 ? (
-            churchDetails.serviceTimes.map((service) => (
+            churchDetails.serviceTimes.map((service: ServiceTime) => (
               <div key={service.id} className="space-y-1">
                 <p className="text-sm font-medium">
                   {dayNames[service.day_of_week]}
