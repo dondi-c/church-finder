@@ -2,12 +2,6 @@ import { pgTable, text, serial, integer, boolean, timestamp, time, decimal } fro
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").unique().notNull(),
-  password: text("password").notNull(),
-});
-
 export const churches = pgTable("churches", {
   id: serial("id").primaryKey(),
   place_id: text("place_id").unique().notNull(),
@@ -50,6 +44,13 @@ export const churchRelations = relations(churches, ({ many }) => ({
 export const serviceTimeRelations = relations(serviceTimes, ({ one }) => ({
   church: one(churches, {
     fields: [serviceTimes.church_id],
+    references: [churches.id],
+  }),
+}));
+
+export const reviewRelations = relations(reviews, ({ one }) => ({
+  church: one(churches, {
+    fields: [reviews.church_id],
     references: [churches.id],
   }),
 }));
