@@ -97,6 +97,7 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
     const request = {
       bounds,
       type: "church",
+      fields: ["name", "geometry", "place_id", "vicinity", "rating", "photos"],
     };
 
     service.nearbySearch(request, async (results: any, status: any) => {
@@ -110,11 +111,13 @@ export default function Map({ onChurchSelect, selectedDenomination }: MapProps) 
             if (!place.geometry?.location || !place.place_id) continue;
 
             // Get photo references directly from the place result
-            const photos = place.photos?.slice(0, 1).map((photo: any) => ({
+            const photos = place.photos?.map((photo: any) => ({
               photo_reference: photo.photo_reference,
-            })) || [];
+            })).slice(0, 1) || [];
 
-            // Fetch church details to check denomination
+            console.log("Photo reference for", place.name, ":", photos[0]?.photo_reference);
+
+
             const response = await fetch(
               `/api/churches/${place.place_id}?${new URLSearchParams({
                 name: place.name || "",

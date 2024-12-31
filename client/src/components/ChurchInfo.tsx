@@ -152,14 +152,15 @@ export default function ChurchInfo({ church }: ChurchInfoProps) {
         {church.photos?.[0]?.photo_reference && !photoError && (
           <div className="mt-4 relative">
             <img
-              src={`/api/maps/photo/${church.photos[0].photo_reference}`}
+              src={`/api/maps/photo/${encodeURIComponent(church.photos[0].photo_reference)}`}
               alt={church.name}
               className="w-full h-48 object-cover rounded-md"
-              onError={() => {
+              onError={(e) => {
+                console.error("Failed to load church photo");
                 setPhotoError(true);
                 toast({
                   title: "Photo Error",
-                  description: "Could not load church photo",
+                  description: "Could not load church photo. Please try again later.",
                   variant: "destructive",
                 });
               }}
